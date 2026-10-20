@@ -19,17 +19,20 @@ Um backup de 80 GB em `.tar.gz` no Drive é um problema quando o disco local nã
 | --- | --- |
 | **Meu Drive** | Lista seus `.tar.gz`/`.tgz` com o estado do índice (indexado, sem índice, indexando %). |
 | **Explorar** | Pastas em cartões ou lista, breadcrumb, busca por caminho, composição da pasta por tamanho. |
-| **Prévia e download** | Prévia de texto e download de qualquer arquivo, lendo só o trecho dele. |
+| **Prévia e download** | Prévia de texto (com loader) e download de qualquer arquivo, lendo só o trecho dele. |
+| **Baixar pasta** | Baixa uma pasta inteira (ou o arquivo todo) como `.zip` gerado em streaming, sem gravar nada em disco no servidor. |
 | **Índices** | Gerencia os índices locais: abrir pasta, recriar, excluir. |
-| **Tarefas** | Progresso, velocidade, tempo restante e cancelamento das indexações. |
+| **Tarefas** | Duas abas: **Indexações** e **Downloads**, com progresso, velocidade, tempo restante e cancelamento. Rodam em segundo plano e não bloqueiam o app. |
 | **Desempenho** | Benchmark de conexões × tamanho de bloco e aplicação da melhor configuração com um clique. |
-| **Configurações** | Pasta dos índices, espaçamento dos checkpoints, upload do índice ao Drive, conexões, bloco e limite da prévia. |
+| **Configurações** | Idioma, pasta dos índices, espaçamento dos checkpoints, upload do índice ao Drive, conexões, bloco e limite da prévia. |
 
 Outros pontos:
 
 - **Somente leitura no original.** O índice é um arquivo novo (`<nome>.tgzindex.zip`), salvo localmente e, se você quiser, enviado à mesma pasta do original no Drive.
 - **Indexação isolada.** Ela roda em um processo separado. Cancelar encerra só esse processo e o servidor web continua de pé.
 - **Arquivos maiores que 2 GiB no Windows.** Usa [`rapidgzip`](https://github.com/mxmlnkn/rapidgzip), que é 64-bit (o `indexed_gzip` falha com arquivos desse tamanho no Windows).
+- **Multilíngue:** português (Brasil) e inglês (EUA), com troca no menu lateral ou em Configurações. O padrão segue o idioma do navegador. Para adicionar um idioma, inclua um dicionário em `MSG` no `static/app.js`.
+- **Downloads sem travar a tela.** O navegador baixa normalmente e o servidor registra cada download; acompanhe na aba **Tarefas › Downloads** (e no selo do topo) enquanto navega.
 - **Tema claro/escuro** automático e layout responsivo.
 
 ## Como funciona
@@ -93,7 +96,8 @@ Abra <http://127.0.0.1:5000>.
 
 1. Em **Meu Drive**, escolha o arquivo e clique em **Indexar** (ou cole o ID/URL de compartilhamento).
 2. Acompanhe em **Tarefas**. A indexação lê o arquivo uma única vez e pode ser cancelada a qualquer momento.
-3. Quando terminar, **Explorar** abre a árvore na hora. Clique em um arquivo para ver a prévia ou baixar.
+3. Quando terminar, **Explorar** abre a árvore na hora. Clique em um arquivo para ver a prévia ou baixar; use o ícone de download (ou **Baixar pasta**) para pastas inteiras em `.zip`.
+4. Os downloads aparecem em **Tarefas › Downloads**, com progresso e opção de cancelar.
 
 Opções de linha de comando:
 
@@ -156,6 +160,7 @@ python gdrive_targz_stream.py <ID_OU_URL> --extract caminho/arquivo.txt --out sa
 - **A primeira passada lê o arquivo inteiro.** Não existe atalho: o tar está dentro de um único stream gzip. O tempo depende da sua rede e dos limites do Drive.
 - **Índices grandes usam memória.** Com milhões de arquivos, a árvore em memória pode ocupar centenas de MB e a primeira abertura leva alguns segundos.
 - **Extrair um arquivo** baixa e descomprime até `spacing_mb` MB antes do ponto desejado.
+- O `.zip` de pasta é gerado na hora, sem compressão (os arquivos são guardados como estão) e com zip64, então não há limite de tamanho. O tamanho final é ligeiramente maior que a soma dos arquivos.
 - Se a indexação for interrompida, ela recomeça do zero.
 - O servidor escuta apenas em `127.0.0.1` e **não tem autenticação própria**, porque usa o seu acesso ao Drive. Não o exponha na rede.
 

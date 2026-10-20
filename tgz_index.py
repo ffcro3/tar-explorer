@@ -211,6 +211,25 @@ def list_local(custom_dir=None):
     return out
 
 
+class _Sink:
+    """Destino nao-seekable do zip: acumula bytes e entrega aos poucos (nada vai a disco)."""
+
+    def __init__(self):
+        self.buf = bytearray()
+
+    def write(self, b):
+        self.buf += b
+        return len(b)
+
+    def flush(self):
+        pass
+
+    def take(self):
+        out = bytes(self.buf)
+        self.buf.clear()
+        return out
+
+
 class Index:
     """Indice carregado: arvore por pasta, busca e leitura de trechos sem percorrer o arquivo todo."""
 
@@ -294,8 +313,9 @@ class Index:
         e = self.kids.get(parent, {}).get(name)
         return self.members[e[2]] if e and not e[0] else None
 
-    def open_reader(self):
-        raw = DriveStream(self.session, self.fid, chunk=4 << 20, ahead=2)  # leituras pontuais: blocos menores
+    def open_reader(self, bulk=False):
+        # leituras pontuais usam blocos menores; downloads grandes usam a configuracao de velocidade
+        raw = DriveStream(self.session, self.fid) if bulk else DriveStream(self.session, self.fid, chunk=4 << 20, ahead=2)
         igz = rapidgzip.RapidgzipFile(raw, parallelization=1)
         igz.import_index(io.BytesIO(self.gzidx))
         return raw, igz
@@ -322,6 +342,61 @@ class Index:
                 igz.close()
                 raw.close()
         return m, gen()
+
+
+def folder_members(index, folder):
+    """Arquivos (nao pastas) de uma pasta, em ordem de offset, com o nome relativo dentro do zip."""
+    folder = norm_path(folder)
+    base = posixpath.basename(folder) or index.meta["name"].split(".tar")[0].split(".tgz")[0] or "arquivos"
+    out = []
+    for m in index.members:
+        if m[2]:
+            continue
+        p = norm_path(m[0])
+        if not p or (folder and not p.startswith(folder + "/")):
+            continue
+        out.append((m, f"{base}/{p[len(folder) + 1:] if folder else p}"))
+    out.sort(key=lambda x: x[0][3])
+    return base, out
+
+
+def iter_zip(index, folder, chunk=1 << 20):
+    """Gera um .zip (sem compressao, zip64) de uma pasta lendo o .tar.gz em ordem, em streaming."""
+    _, members = folder_members(index, folder)
+    sink, (raw, igz) = _Sink(), index.open_reader(bulk=True)
+    now = time.localtime()[:6]
+    try:
+        with zipfile.ZipFile(sink, "w", zipfile.ZIP_STORED, allowZip64=True) as zf:
+            for m, arc in members:
+                zi = zipfile.ZipInfo(arc, now)
+                zi.compress_type, zi.file_size = zipfile.ZIP_STORED, m[1]
+                gap = m[3] - igz.tell()
+                if 0 <= gap <= (256 << 20):  # membros vizinhos: descarta o intervalo em vez de saltar (evita redescomprimir)
+                    while gap > 0:
+                        skipped = igz.read(min(chunk, gap))
+                        if not skipped:
+                            break
+                        gap -= len(skipped)
+                else:
+                    igz.seek(m[3])
+                left = m[1]
+                with zf.open(zi, "w", force_zip64=True) as dest:
+                    while left > 0:
+                        b = igz.read(min(chunk, left))
+                        if not b:
+                            break
+                        dest.write(b)
+                        left -= len(b)
+                        if len(sink.buf) >= chunk:
+                            yield sink.take()
+                if len(sink.buf) >= chunk:
+                    yield sink.take()
+        tail = sink.take()  # diretorio central do zip
+        if tail:
+            yield tail
+    finally:
+        igz.close()
+        raw.close()
 
 
 # ---------------------------------------------------------------- benchmark

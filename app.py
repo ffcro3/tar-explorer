@@ -12,6 +12,9 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
+
+from urllib.parse import quote
 
 from flask import Flask, Response, abort, jsonify, request, send_from_directory
 
@@ -29,6 +32,7 @@ state = {"session": None, "settings": dict(DEFAULTS)}
 indexes = {}  # file_id -> Index | None (memo)
 jobs = {}     # file_id -> trabalho de indexacao
 bench = {"state": "none"}
+downloads = {}  # token -> progresso de um download em andamento
 
 
 # ------------------------------------------------------------ configuracoes
@@ -78,7 +82,7 @@ def api_settings_set():
             if k in new:
                 clean[k] = min(max(kind(new[k]), lo), hi)
     except (TypeError, ValueError):
-        return jsonify({"error": "Valores numericos invalidos."}), 400
+        return jsonify({"error": "Invalid numeric values.", "code": "invalid_numbers"}), 400
     if "upload" in new:
         clean["upload"] = bool(new["upload"])
     if "index_dir" in new:
@@ -87,7 +91,7 @@ def api_settings_set():
             try:
                 check_writable(d)
             except OSError as e:
-                return jsonify({"error": f"Nao consigo gravar em '{d}': {e.strerror or e}"}), 400
+                return jsonify({"error": f"Cannot write to '{d}'", "code": "dir_not_writable", "params": {"dir": d, "reason": str(e.strerror or e)}}), 400
         if d != state["settings"]["index_dir"]:
             indexes.clear()
         clean["index_dir"] = d
@@ -155,6 +159,93 @@ def need_index(fid):
     return ix
 
 
+# ------------------------------------------------------------ downloads
+def disposition(name):
+    """Content-Disposition seguro para nomes com acento (RFC 5987)."""
+    ascii_name = name.encode("ascii", "ignore").decode().replace('"', "").strip() or "download"
+    return "attachment; filename=\"%s\"; filename*=UTF-8''%s" % (ascii_name, quote(name))
+
+
+def track(token, name, total, kind):
+    """Registra um download para a interface mostrar em Tarefas (preparando, baixando, concluido)."""
+    now = time.time()
+    for k in [k for k, v in downloads.items() if v["state"] not in ("preparing", "sending") and now - v["started"] > 3600]:
+        del downloads[k]
+    token = token if token and len(token) <= 40 else uuid.uuid4().hex[:12]
+    d = {"id": token, "kind": kind, "name": name, "total": total, "sent": 0, "state": "preparing", "started": now,
+         "error": None, "files": 1 if kind == "file" else 0, "rate": 0, "eta": 0, "cancel": threading.Event()}
+    downloads[token] = d
+    return d
+
+
+def tracked(gen, d):
+    last_t, last_n = time.time(), 0
+    try:
+        for chunk in gen:
+            if d["cancel"].is_set():
+                d["state"] = "interrupted"
+                return
+            d["sent"] += len(chunk)
+            d["state"] = "sending"
+            now = time.time()
+            if now - last_t >= 1:
+                inst = (d["sent"] - last_n) / (now - last_t)
+                d["rate"] = inst if not d["rate"] else 0.6 * d["rate"] + 0.4 * inst
+                d["eta"] = max(0, d["total"] - d["sent"]) / d["rate"] if d["rate"] else 0
+                last_t, last_n = now, d["sent"]
+            yield chunk
+        d["state"], d["rate"], d["eta"] = "done", 0, 0
+    except GeneratorExit:
+        d["state"] = "interrupted"  # o navegador cancelou
+        raise
+    except Exception as e:
+        d["state"], d["error"] = "error", f"{type(e).__name__}: {e}"
+        raise
+    finally:
+        d["finished"] = time.time()
+        if d["state"] != "sending":
+            d["rate"] = 0
+        gen.close()
+
+
+def public_dl(d):
+    return {k: v for k, v in d.items() if k != "cancel"}
+
+
+@app.get("/api/downloads")
+def api_downloads():
+    return jsonify(sorted((public_dl(d) for d in downloads.values()), key=lambda x: -x["started"]))
+
+
+@app.post("/api/downloads/cancel")
+def api_downloads_cancel():
+    d = downloads.get((request.json or {}).get("id", ""))
+    if d:
+        d["cancel"].set()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/downloads/clear")
+def api_downloads_clear():
+    for k in [k for k, v in downloads.items() if v["state"] not in ("preparing", "sending")]:
+        del downloads[k]
+    return jsonify({"ok": True})
+
+
+@app.get("/api/folder")
+def api_folder():
+    """Baixa uma pasta inteira como .zip gerado em streaming (nada e gravado em disco)."""
+    fid, path = parse_file_id(request.args["file"]), tgz_index.norm_path(request.args.get("path", ""))
+    ix = need_index(fid)
+    if path not in ix.agg:
+        abort(404)
+    base, members = tgz_index.folder_members(ix, path)
+    d = track(request.args.get("t"), base + ".zip", ix.agg[path][0], "zip")
+    d["files"] = len(members)
+    return Response(tracked(tgz_index.iter_zip(ix, path), d), mimetype="application/zip",
+                    headers={"Content-Disposition": disposition(base + ".zip")})
+
+
 # ------------------------------------------------------------ navegacao
 @app.get("/api/tree")
 def api_tree():
@@ -185,8 +276,9 @@ def api_file():
         abort(404)
     name = os.path.basename(path)
     if download:
-        headers = {"Content-Disposition": f'attachment; filename="{name}"', "Content-Length": str(m[1])}
-        return Response(gen, mimetype="application/octet-stream", headers=headers)
+        d = track(request.args.get("t"), name, m[1], "file")
+        headers = {"Content-Disposition": disposition(name), "Content-Length": str(m[1])}
+        return Response(tracked(gen, d), mimetype="application/octet-stream", headers=headers)
     data = b"".join(gen)
     if b"\0" in data[:8192]:
         return jsonify({"binary": True, "size": m[1]})
@@ -242,7 +334,10 @@ def run_job(fid, job, dest, spacing, upload):
             job["state"] = "done"
         else:
             job["state"] = "error"
-            job["error"] = job["error"] or ("O processo de indexacao terminou inesperadamente (codigo %s). %s" % (code, " ".join(tail[-3:])))[:500]
+            if not job["error"]:
+                job["error_code"] = "worker_exit"
+                job["error_params"] = {"code": code, "tail": " ".join(tail[-3:])[:400]}
+                job["error"] = "Indexing process ended unexpectedly (code %s)." % code
     except Exception as e:
         job["state"], job["error"] = "error", f"{type(e).__name__}: {e}"
     job["finished"] = time.time()
@@ -259,7 +354,7 @@ def api_index_start():
     try:
         check_writable(idx_dir())  # falha cedo, antes de gastar horas lendo o arquivo
     except OSError as e:
-        return jsonify({"error": f"Nao consigo gravar em '{idx_dir()}': {e.strerror or e}"}), 400
+        return jsonify({"error": f"Cannot write to '{idx_dir()}'", "code": "dir_not_writable", "params": {"dir": idx_dir(), "reason": str(e.strerror or e)}}), 400
     job = {"id": fid, "name": meta["name"], "state": "running", "got": 0, "size": meta["size"], "rate": 0,
            "eta": 0, "members": 0, "log": [], "error": None, "dir": idx_dir(), "started": time.time(),
            "upload": bool(b.get("upload", s["upload"])), "cancel": threading.Event()}

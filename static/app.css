@@ -217,7 +217,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .hero { max-width: 640px; margin: 6vh auto 0; display: grid; gap: 18px; }
 .hero .card { display: grid; gap: 16px; }
 
-#toasts { position: fixed; right: 20px; bottom: 20px; display: grid; gap: 8px; z-index: 50; }
+#toasts { position: fixed; left: 20px; bottom: 20px; display: grid; gap: 8px; z-index: 50; }
 .toast { background: var(--ink); color: var(--ink-fg); padding: 10px 16px; border-radius: 10px; box-shadow: var(--shadow); max-width: 360px; animation: in .2s ease; }
 .toast.err { background: var(--bad); color: #fff; }
 @keyframes in { from { transform: translateY(8px); opacity: 0; } }
@@ -245,3 +245,21 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
   .search { width: 100%; max-width: 220px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---- downloads, loaders, idioma ---- */
+.spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line-strong); border-top-color: var(--accent); display: inline-block; animation: spin .8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading { display: flex; align-items: center; gap: 10px; color: var(--muted); padding: 14px 0; }
+.bar.indet > i { width: 35% !important; animation: indet 1.2s ease-in-out infinite; transition: none; }
+@keyframes indet { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+.toast-link { margin-left: 10px; color: inherit; font-weight: 600; text-decoration: underline; }
+.fwrap { position: relative; }
+.fwrap .fcard { width: 100%; }
+.fwrap .dlbtn { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity .15s; background: var(--surface); border: 1px solid var(--line); }
+.fwrap:hover .dlbtn, .fwrap:focus-within .dlbtn { opacity: 1; }
+@media (hover: none) { .fwrap .dlbtn { opacity: 1; } }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.seg.lang button { flex: 1; justify-content: center; }
+.side-foot .seg.lang { display: flex; }
+.shell.collapsed .seg.lang { display: none; }
+[hidden] { display: none !important; }

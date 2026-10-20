@@ -14,11 +14,11 @@ Navegue, pesquise, visualize e baixe arquivos de dentro de um `.tar.gz` guardado
 
 | Meu Drive | Explorar |
 | --- | --- |
-| ![Meu Drive](docs/drive.jpg) | ![Explorar](docs/explorar.jpg) |
+| ![Meu Drive](docs/drive.png) | ![Explorar](docs/explorar.png) |
 
 | Prévia de arquivo | Tarefas (indexações e downloads) |
 | --- | --- |
-| ![Prévia](docs/previa.jpg) | ![Tarefas](docs/tarefas.jpg) |
+| ![Prévia](docs/previa.png) | ![Tarefas](docs/tarefas.png) |
 
 ## Por que existe
 

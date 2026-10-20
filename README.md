@@ -14,11 +14,11 @@ Browse, search, preview and download files from inside a `.tar.gz` stored on Goo
 
 | My Drive | Explore |
 | --- | --- |
-| ![My Drive](docs/drive.jpg) | ![Explore](docs/explorar.jpg) |
+| ![My Drive](docs/drive.png) | ![Explore](docs/explorar.png) |
 
 | File preview | Tasks (indexing and downloads) |
 | --- | --- |
-| ![Preview](docs/previa.jpg) | ![Tasks](docs/tarefas.jpg) |
+| ![Preview](docs/previa.png) | ![Tasks](docs/tarefas.png) |
 
 ## Why it exists
 

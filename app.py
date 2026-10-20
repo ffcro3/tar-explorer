@@ -114,7 +114,7 @@ def api_me():
 def api_drive():
     """.tar.gz/.tgz do Drive, mais recentes primeiro, com a situacao do indice de cada um."""
     term = request.args.get("q", "").replace("\\", "\\\\").replace("'", "\\'")
-    q = "trashed=false and (name contains '.tar.gz' or name contains '.tgz')"
+    q = "trashed=false and (name contains '.tar.gz' or name contains '.tgz') and not name contains '.tgzindex.zip'"
     if term:
         q += f" and name contains '{term}'"
     r = state["session"].get(API, params={
@@ -122,7 +122,7 @@ def api_drive():
         "fields": "files(id,name,size,modifiedTime)",
         "supportsAllDrives": "true", "includeItemsFromAllDrives": "true"})
     r.raise_for_status()
-    files = r.json().get("files", [])
+    files = [f for f in r.json().get("files", []) if not f["name"].endswith(".tgzindex.zip")]  # nunca lista os proprios indices
     for f in files:
         f["indexed"] = os.path.exists(tgz_index.local_path(f["id"], state["settings"]["index_dir"] or None))
         j = jobs.get(f["id"])

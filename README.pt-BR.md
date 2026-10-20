@@ -118,6 +118,7 @@ Opções de linha de comando:
 | Opção | Descrição |
 | --- | --- |
 | `--port N` | Porta do servidor (padrão `5000`). |
+| `--host ENDEREÇO` | Endereço de escuta (padrão `127.0.0.1`). Use `0.0.0.0` para acessar pela rede. Também lido de `TGZ_HOST` ou da chave `host` no `settings.json`. |
 | `--index-dir PASTA` | Pasta local dos índices (sobrescreve a configuração salva). |
 | `--service-account JSON` | Usa conta de serviço em vez de OAuth. |
 | `--client-secret ARQUIVO` | Caminho do `credentials.json`. |
@@ -178,7 +179,7 @@ python gdrive_targz_stream.py <ID_OU_URL> --extract caminho/arquivo.txt --out sa
 - **Extrair um arquivo** baixa e descomprime até `spacing_mb` MB antes do ponto desejado.
 - O `.zip` de pasta é gerado na hora, sem compressão (os arquivos são guardados como estão) e com zip64, então não há limite de tamanho. O tamanho final é ligeiramente maior que a soma dos arquivos.
 - Se a indexação for interrompida, ela recomeça do zero.
-- O servidor escuta apenas em `127.0.0.1` e **não tem autenticação própria**, porque usa o seu acesso ao Drive. Não o exponha na rede.
+- Por padrão o servidor escuta apenas em `127.0.0.1`. Ele **não tem autenticação própria**, porque usa o seu acesso ao Drive: quem alcançar a porta consegue ver e baixar seus arquivos. Se liberar o acesso pela rede (`--host 0.0.0.0`), faça isso só em rede privada de confiança e permita a porta apenas em redes privadas no firewall.
 
 ## Solução de problemas
 

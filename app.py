@@ -458,6 +458,7 @@ if __name__ == "__main__":
     ap.add_argument("--service-account", metavar="JSON")
     ap.add_argument("--client-secret", default="credentials.json")
     ap.add_argument("--port", type=int, default=5000)
+    ap.add_argument("--host", help="endereco de escuta (padrao 127.0.0.1; 0.0.0.0 abre para a rede). Tambem lido de settings.json ou TGZ_HOST")
     ap.add_argument("--index-dir", help="pasta local dos indices (sobrescreve a configuracao salva)")
     a = ap.parse_args()
     load_settings()
@@ -465,4 +466,7 @@ if __name__ == "__main__":
         state["settings"]["index_dir"] = a.index_dir
     state["sa"] = a.service_account
     state["session"] = get_session(a.service_account, a.client_secret)  # autentica antes de subir
-    app.run(host="127.0.0.1", port=a.port, threaded=True)
+    host = a.host or os.environ.get("TGZ_HOST") or state["settings"].get("host") or "127.0.0.1"
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        print(f"AVISO: escutando em {host}:{a.port}. O app nao tem login e usa o seu acesso ao Drive: qualquer pessoa na rede alcanca seus arquivos.")
+    app.run(host=host, port=a.port, threaded=True)

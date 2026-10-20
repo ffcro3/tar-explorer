@@ -118,6 +118,7 @@ Command-line options:
 | Option | Description |
 | --- | --- |
 | `--port N` | Server port (default `5000`). |
+| `--host ADDR` | Listen address (default `127.0.0.1`). Use `0.0.0.0` to allow access from your network. Also read from `TGZ_HOST` or a `host` key in `settings.json`. |
 | `--index-dir FOLDER` | Local indexes folder (overrides the saved setting). |
 | `--service-account JSON` | Use a service account instead of OAuth. |
 | `--client-secret FILE` | Path to `credentials.json`. |
@@ -178,7 +179,7 @@ python gdrive_targz_stream.py <ID_OR_URL> --extract path/file.txt --out output/
 - **Extracting a file** downloads and decompresses up to `spacing_mb` MB before the target.
 - Folder `.zip` files are generated on the fly, uncompressed (files are stored as-is) and with zip64, so there is no size limit. The final size is slightly larger than the sum of the files.
 - If indexing is interrupted, it restarts from scratch.
-- The server listens only on `127.0.0.1` and has **no authentication of its own**, because it uses your Drive access. Do not expose it to the network.
+- By default the server listens only on `127.0.0.1`. It has **no authentication of its own** because it uses your Drive access, so anyone who can reach the port can browse and download your files. If you enable network access (`--host 0.0.0.0`), do it only on a trusted private network and allow the port only on private networks in your firewall.
 
 ## Troubleshooting
 

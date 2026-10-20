@@ -1,5 +1,7 @@
 # Tar Explorer
 
+[English](README.en.md) · **Português (Brasil)**
+
 Navegue, pesquise, visualize e baixe arquivos de dentro de um `.tar.gz` guardado no Google Drive, **sem baixar o arquivo inteiro, sem gravar o `.tar.gz` em disco e sem alterar nada no Drive**.
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
@@ -160,6 +162,7 @@ python gdrive_targz_stream.py <ID_OU_URL> --extract caminho/arquivo.txt --out sa
 ├── tgz_index.py              # indexação, índice, árvore, busca, benchmark e CLI
 ├── gdrive_targz_stream.py    # autenticação e leitura do Drive por Range (streaming)
 ├── docs/                     # capturas de tela do README
+├── README.en.md              # README em inglês
 ├── static/
 │   ├── index.html
 │   ├── app.css               # tokens de design, tema claro/escuro, responsivo

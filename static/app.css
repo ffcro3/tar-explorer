@@ -263,3 +263,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .side-foot .seg.lang { display: flex; }
 .shell.collapsed .seg.lang { display: none; }
 [hidden] { display: none !important; }
+
+/* ---- tabelas: ordenar e redimensionar ---- */
+th { position: relative; }
+.th-btn { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font: inherit; color: inherit; }
+.th-btn:hover, th[aria-sort="ascending"] .th-btn, th[aria-sort="descending"] .th-btn { color: var(--fg); }
+.th-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.th-btn .arrow { font-size: 9px; }
+th.r .th-btn { flex-direction: row-reverse; }
+.rz { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; user-select: none; }
+.rz::after { content: ""; position: absolute; right: 3px; top: 25%; height: 50%; width: 1px; background: var(--line-strong); }
+.rz:hover::after, .resizing .rz::after { background: var(--accent); width: 2px; }
+table.fixed { table-layout: fixed; }
+table.fixed td { overflow: hidden; text-overflow: ellipsis; }
+body.resizing { cursor: col-resize; user-select: none; }

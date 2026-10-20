@@ -167,6 +167,36 @@ function ftile(name) {
 }
 const PAL = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)", "var(--c6)"];
 
+// ---------------------------------------------------------------- tabelas: ordenar e redimensionar colunas
+const SORT = {}, WIDTH = {};
+function sortBy(key, items, getters) {
+  const st = SORT[key], g = st && getters[st.f];
+  if (!g) return items;
+  return [...items].sort((a, b) => { const x = g(a), y = g(b); return st.dir * (typeof x === "string" ? x.localeCompare(y, LANG, { numeric: true, sensitivity: "base" }) : x - y); });
+}
+function headRow(key, cols, redraw) {
+  const tr_ = h("tr", null, cols.map(([label, field, cls], i) => {
+    const st = SORT[key], on = field && st && st.f === field, w = WIDTH[key]?.[i];
+    const th = h("th", { class: cls || "", "aria-sort": on ? (st.dir > 0 ? "ascending" : "descending") : null, style: w ? `width:${w}px` : null },
+      field ? h("button", { class: "th-btn", onclick: () => { SORT[key] = on ? { f: field, dir: -st.dir } : { f: field, dir: 1 }; redraw(); } }, label ? tr(label) : "", on ? h("span", { class: "arrow" }, st.dir > 0 ? "▲" : "▼") : null) : (label ? tr(label) : ""),
+      i < cols.length - 1 ? h("span", { class: "rz", role: "separator", "aria-orientation": "vertical", onclick: e => e.stopPropagation(), onmousedown: e => startResize(e, key, i) }) : null);
+    return th;
+  }));
+  if (WIDTH[key]) queueMicrotask(() => tr_.closest("table")?.classList.add("fixed"));
+  return tr_;
+}
+function startResize(e, key, i) {
+  e.preventDefault();
+  const th = e.target.parentElement, table = th.closest("table"), ths = [...th.parentElement.children];
+  if (!WIDTH[key]) WIDTH[key] = ths.map(t => t.offsetWidth);
+  ths.forEach((t, j) => { t.style.width = WIDTH[key][j] + "px"; });
+  table.classList.add("fixed");
+  const x0 = e.clientX, w0 = WIDTH[key][i];
+  const move = ev => { const w = Math.max(60, w0 + ev.clientX - x0); WIDTH[key][i] = w; th.style.width = w + "px"; };
+  const up = () => { removeEventListener("mousemove", move); removeEventListener("mouseup", up); document.body.classList.remove("resizing"); };
+  document.body.classList.add("resizing"); addEventListener("mousemove", move); addEventListener("mouseup", up);
+}
+
 // ---------------------------------------------------------------- estado global
 const S = { settings: null, me: null, jobs: [], dls: [], drive: [], hook: null, tree: null, sel: null, mode: "cards", search: "", searchRes: null, fid: null, path: "", pop: false, tab: "index", nsig: "" };
 const main = () => $("#main");
@@ -288,10 +318,13 @@ async function vDrive() {
   renderTop([{ label: tr("nav.drive") }]);
   let q = "";
   const tbody = h("tbody"), pasteIn = h("input", { class: "input", placeholder: tr("drive.paste"), id: "paste", "aria-label": tr("drive.paste") });
+  const DG = { name: f => f.name, size: f => +f.size, modified: f => f.modifiedTime || "", index: f => (f.indexed ? 2 : f.job === "running" ? 1 : 0) };
+  const thd = h("thead");
   const draw = () => {
+    thd.replaceChildren(headRow("drive", [["drive.cols.name", "name"], ["drive.cols.size", "size"], ["drive.cols.modified", "modified"], ["drive.cols.index", "index"], ["", null, "r"]], draw));
     tbody.replaceChildren();
     if (!S.drive.length) { tbody.append(h("tr", null, h("td", { colspan: 5 }, h("div", { class: "empty" }, h("div", { class: "ic" }, icon("search")), h("h2", null, tr("drive.empty")), h("p", null, tr("drive.empty_hint")))))); return; }
-    for (const f of S.drive) tbody.append(h("tr", { class: "click", onclick: () => go(f.id) },
+    for (const f of sortBy("drive", S.drive, DG)) tbody.append(h("tr", { class: "click", onclick: () => go(f.id) },
       h("td", null, h("div", { class: "name-cell" }, h("div", { class: "ftile", style: "--tc:#c58516" }, "TGZ"), h("div", { class: "t" }, f.name))),
       h("td", { class: "num" }, fmt(+f.size)), h("td", { class: "muted" }, date(f.modifiedTime)), h("td", null, idxBadge(f)),
       h("td", { class: "r" }, f.indexed ? h("button", { class: "btn sm", onclick: e => { e.stopPropagation(); go(f.id); } }, icon("folder", 15), tr("common.open"))
@@ -312,7 +345,7 @@ async function vDrive() {
     h("div", { class: "panel" },
       h("div", { class: "panel-head" }, h("h2", null, tr("drive.panel")),
         h("div", { class: "actions" }, searchBox(tr("drive.search"), "", debounce(v => { q = v; load(); }, 350)), h("button", { class: "icon-btn", title: tr("common.refresh"), "aria-label": tr("common.refresh"), onclick: load }, icon("refresh")))),
-      h("div", { class: "tbl-wrap" }, h("table", null, h("thead", null, h("tr", null, ["drive.cols.name", "drive.cols.size", "drive.cols.modified", "drive.cols.index", ""].map((k, i) => h("th", { class: i === 4 ? "r" : "" }, k && tr(k))))), tbody)))));
+      h("div", { class: "tbl-wrap" }, h("table", null, thd, tbody)))));
   load();
 }
 
@@ -386,8 +419,8 @@ function row(it, showPath) {
 }
 function table(items, showPath) {
   return h("div", { class: "panel" }, h("div", { class: "tbl-wrap" }, h("table", null,
-    h("thead", null, h("tr", null, h("th", null, tr("drive.cols.name")), h("th", { class: "r" }, tr("drive.cols.size")), h("th", { class: "r" }, tr("unit.items")), h("th", null, ""))),
-    h("tbody", null, items.map(i => row(i, showPath))))));
+    h("thead", null, headRow("browse", [["drive.cols.name", "name"], ["drive.cols.size", "size", "r"], ["unit.items", "items", "r"], ["", null]], drawBody)),
+    h("tbody", null, sortBy("browse", items, { name: i => i.name, size: i => i.size, items: i => (i.dir ? i.count : -1) }).map(i => row(i, showPath))))));
 }
 function drawBody() {
   const body = $("#bbody"); if (!body) return; body.replaceChildren();
@@ -487,8 +520,8 @@ async function vIndexes() {
       h("div", { class: "head" }, h("div", null, h("h1", null, tr("indexes.title")), h("p", null, tr("indexes.sub"))),
         h("div", { class: "actions" }, h("span", { class: "chip mono", title: d.dir }, d.dir), h("button", { class: "btn", onclick: () => api("/api/open-folder", { method: "POST", body: {} }).catch(e => toast(apiErr(e), true)) }, icon("open", 16), tr("indexes.open_folder")), h("a", { class: "btn", href: "#/settings" }, icon("sliders", 16), tr("indexes.change_folder")))),
       d.items.length ? h("div", { class: "panel" }, h("div", { class: "panel-head" }, h("h2", null, tr("indexes.count", { n: d.items.length })), h("span", { class: "muted num" }, tr("indexes.on_disk", { size: fmt(totalSize) }))),
-        h("div", { class: "tbl-wrap" }, h("table", null, h("thead", null, h("tr", null, ["indexes.cols.file", "indexes.cols.members", "indexes.cols.orig", "indexes.cols.index", "indexes.cols.created", ""].map((k, i) => h("th", { class: i === 5 ? "r" : "" }, k && tr(k))))),
-          h("tbody", null, d.items.map(x => h("tr", null,
+        h("div", { class: "tbl-wrap" }, h("table", null, h("thead", null, headRow("indexes", [["indexes.cols.file", "file"], ["indexes.cols.members", "members"], ["indexes.cols.orig", "orig"], ["indexes.cols.index", "index"], ["indexes.cols.created", "created"], ["", null, "r"]], load)),
+          h("tbody", null, sortBy("indexes", d.items, { file: x => x.name || x.id, members: x => x.count ?? 0, orig: x => x.gz_size, index: x => x.file_size, created: x => x.created || "" }).map(x => h("tr", null,
             h("td", null, h("div", { class: "name-cell" }, h("div", { class: "ftile", style: "--tc:#c58516" }, "TGZ"), h("div", { class: "t" }, x.name || x.id))),
             h("td", { class: "num" }, x.count != null ? num(x.count) : tr("common.none")), h("td", { class: "num" }, fmt(x.gz_size)), h("td", { class: "num" }, fmt(x.file_size)), h("td", { class: "muted" }, date(x.created)),
             h("td", { class: "r" }, h("div", { class: "actions", style: "justify-content:flex-end" },

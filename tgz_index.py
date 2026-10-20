@@ -84,7 +84,7 @@ def build(session, fid, dest_dir=None, spacing_mb=32, upload=True, log=print,
             if cancel is not None and cancel.is_set():
                 raw.close()  # derruba a leitura em andamento
                 return
-            got, el = raw.bytes_fetched, time.time() - t0
+            got, el = min(raw.high, raw.size), time.time() - t0
             rate = got / max(el, 1)
             eta = (raw.size - got) / rate if rate else 0
             if progress:

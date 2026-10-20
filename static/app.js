@@ -73,6 +73,7 @@ const S = { settings: null, me: null, jobs: [], drive: [], hook: null, tree: nul
 const main = () => $("#main");
 const showDetail = on => { $("#detail").hidden = !on; $(".body").classList.toggle("with-detail", on); };
 const runningJobs = () => S.jobs.filter(j => j.state === "running");
+const jpct = j => (j.size ? Math.min(100, 100 * j.got / j.size) : 0);
 
 // ---------------------------------------------------------------- casca (sidebar + topo)
 const NAV = [["drive", "Meu Drive", "cloud"], ["browse", "Explorar", "folder"], ["indexes", "Índices", "db"], ["jobs", "Tarefas", "activity"], ["perf", "Desempenho", "gauge"], ["settings", "Configurações", "sliders"]];
@@ -98,13 +99,12 @@ function renderSide(view) {
 }
 function renderTop(crumbs, searchBox) {
   const top = $("#top"); top.replaceChildren();
-  const rj = runningJobs()[0];
   add(top, [
-    h("button", { class: "icon-btn menu-btn", "aria-label": "Menu", onclick: () => { $("#side").classList.add("open"); $("#scrim").classList.add("open"); } }, icon("menu")),
+    h("button", { class: "icon-btn menu-btn", "aria-label": "Menu", onclick: toggleNav }, icon("menu")),
     h("nav", { class: "crumbs", "aria-label": "Caminho" }, crumbs.map((c, i) => [i ? h("span", { class: "sep" }, icon("chev", 14)) : null,
       c.go ? h("button", { class: "crumb", onclick: c.go }, c.label) : h("span", { class: "crumb last" }, c.label)])),
     searchBox,
-    rj ? h("a", { class: "pill", href: "#/jobs", title: rj.name }, h("span", { class: "dot" }), `Indexando ${rj.size ? (100 * rj.got / rj.size).toFixed(0) : 0}%`) : null]);
+    pillEl()]);
 }
 const searchBox = (ph, val, on) => h("label", { class: "search" }, icon("search", 16), h("input", { type: "search", placeholder: ph, value: val || "", "aria-label": ph, oninput: e => on(e.target.value) }));
 
@@ -333,7 +333,7 @@ function confirmBtn(label, fn) {
 
 // ---------------------------------------------------------------- Tarefas
 function jobCard(j, big) {
-  const pct = j.size ? 100 * j.got / j.size : 0, run = j.state === "running";
+  const pct = jpct(j), run = j.state === "running";
   const state = { running: ["acc", "Indexando"], done: ["good", "Concluído"], error: ["bad", "Falhou"], cancelled: ["", "Cancelado"] }[j.state];
   return h("div", { class: "card job" },
     h("div", { class: "top-row" }, h("div", { class: "name-cell" }, h("div", { class: "ftile", style: "--tc:#c58516" }, "TGZ"), h("div", { class: "t" }, j.name)),
@@ -342,8 +342,8 @@ function jobCard(j, big) {
         !run && j.state === "done" ? h("button", { class: "btn sm", onclick: () => go(j.id) }, icon("folder", 14), "Abrir") : null)),
     run || j.state === "done" ? h("div", { class: "bar" }, h("i", { style: `width:${j.state === "done" ? 100 : pct}%` })) : null,
     h("div", { class: "stats num" },
-      h("span", null, h("b", null, run ? pct.toFixed(1) + "%" : fmt(j.size)), run ? ` · ${fmt(j.got)} de ${fmt(j.size)}` : " lidos"),
-      run ? h("span", null, h("b", null, fmt(j.rate) + "/s")) : null, run && j.rate ? h("span", null, "faltam ", h("b", null, dur(j.eta))) : null,
+      h("span", null, h("b", null, run ? pct.toFixed(1) + "%" : fmt(j.size)), run ? ` · ${fmt(Math.min(j.got, j.size))} de ${fmt(j.size)}` : " lidos"),
+      run ? h("span", null, h("b", null, fmt(j.rate) + "/s")) : null, run && j.rate ? h("span", null, "faltam ", h("b", null, dur(Math.max(0, j.eta)))) : null,
       h("span", null, h("b", null, num(j.members)), " membros")),
     h("div", { class: "muted", style: "font-size:12.5px" }, `Salvando em ${j.dir}${j.upload ? " · enviando ao Drive ao final" : ""}`),
     j.error ? h("div", { class: "alert" }, icon("alert", 16), j.error) : null,
@@ -432,12 +432,48 @@ async function refreshJobs() {
   if (view !== "browse" || !S.tree) renderTopPill();
   if (S.hook) S.hook();
 }
+const pillLabel = rj => (rj.length === 1 ? `Indexando ${jpct(rj[0]).toFixed(0)}%` : `${rj.length} indexações`);
+const jobMeta = j => `${jpct(j).toFixed(1)}% · ${fmt(j.rate)}/s${j.rate ? ` · faltam ${dur(Math.max(0, j.eta))}` : ""}`;
 function renderTopPill() {
-  const rj = runningJobs()[0], old = $("#top .pill");
-  if (old) old.remove();
-  if (rj) $("#top").append(h("a", { class: "pill", href: "#/jobs", title: rj.name }, h("span", { class: "dot" }), `Indexando ${rj.size ? (100 * rj.got / rj.size).toFixed(0) : 0}%`));
+  // Atualiza no lugar (texto e barras) para nao trocar elementos e engolir cliques.
+  const rj = runningJobs(), wrap = $("#top .pillwrap");
+  if (!rj.length) { S.pop = false; if (wrap) wrap.remove(); return; }
+  if (!wrap) { $("#top").append(pillEl()); return; }
+  $(".pill-label", wrap).textContent = pillLabel(rj);
+  $(".pill", wrap).setAttribute("aria-expanded", String(!!S.pop));
+  const pop = $(".pop", wrap), ids = rj.map(j => j.id).join();
+  if (!S.pop) { if (pop) pop.remove(); return; }
+  if (!pop || pop.dataset.ids !== ids) { if (pop) pop.remove(); wrap.append(popEl(rj)); return; }
+  for (const j of rj) {
+    const row = pop.querySelector(`[data-id="${j.id}"]`);
+    if (row) { $(".bar > i", row).style.width = jpct(j) + "%"; $(".pop-meta", row).textContent = jobMeta(j); }
+  }
+}
+function popEl(rj) {
+  return h("div", { class: "pop", "data-ids": rj.map(j => j.id).join(), onclick: e => e.stopPropagation() },
+    rj.map(j => h("div", { class: "pop-job", "data-id": j.id },
+      h("div", { class: "pop-top" }, h("b", { class: "pop-name", title: j.name }, j.name),
+        h("button", { class: "icon-btn", title: "Cancelar", "aria-label": `Cancelar ${j.name}`, onclick: () => api("/api/index/cancel", { body: { file: j.id } }).then(refreshJobs) }, icon("x", 15))),
+      h("div", { class: "bar" }, h("i", { style: `width:${jpct(j)}%` })),
+      h("div", { class: "muted num pop-meta" }, jobMeta(j)))),
+    h("a", { class: "btn sm", href: "#/jobs" }, "Ver tarefas"));
+}
+function pillEl() {
+  const rj = runningJobs();
+  if (!rj.length) { S.pop = false; return null; }
+  return h("div", { class: "pillwrap" },
+    h("button", { class: "pill", "aria-haspopup": "true", "aria-expanded": String(!!S.pop), onclick: e => { e.stopPropagation(); S.pop = !S.pop; renderTopPill(); } },
+      h("span", { class: "dot" }), h("span", { class: "pill-label" }, pillLabel(rj))),
+    S.pop ? popEl(rj) : null);
+}
+function toggleNav() {
+  if (innerWidth <= 860) { $("#side").classList.add("open"); $("#scrim").classList.add("open"); return; }
+  const c = $(".shell").classList.toggle("collapsed");
+  try { localStorage.setItem("nav-collapsed", c ? "1" : ""); } catch { /* sem storage */ }
 }
 (async function boot() {
+  try { if (localStorage.getItem("nav-collapsed")) $(".shell").classList.add("collapsed"); } catch { /* sem storage */ }
+  document.addEventListener("click", () => { if (S.pop) { S.pop = false; renderTopPill(); } });
   $("#scrim").onclick = () => { $("#side").classList.remove("open"); $("#scrim").classList.remove("open"); };
   try { S.settings = await api("/api/settings"); } catch (e) { toast(e.message, true); }
   api("/api/me").then(m => { S.me = m; renderSide(location.hash.slice(2).split(/[/?]/)[0] || "drive"); }).catch(() => { /* sem conta */ });

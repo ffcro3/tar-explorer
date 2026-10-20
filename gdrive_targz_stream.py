@@ -89,6 +89,7 @@ class DriveStream(io.RawIOBase):
         self.pool = ThreadPoolExecutor(ahead)
         self.futs, self.next, self.cur, self.off, self.skip, self.pos = {}, 0, b"", 0, 0, 0
         self.bytes_fetched = 0
+        self.high = 0  # posicao mais avancada ja lida (base do progresso; relituras nao contam)
 
     def readable(self):
         return True
@@ -123,6 +124,8 @@ class DriveStream(io.RawIOBase):
         b[:n] = self.cur[self.off:self.off + n]
         self.off += n
         self.pos += n
+        if self.pos > self.high:
+            self.high = self.pos
         return n
 
     def seekable(self):

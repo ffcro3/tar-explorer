@@ -6,6 +6,18 @@ Navegue, pesquise, visualize e baixe arquivos de dentro de um `.tar.gz` guardado
 ![Flask](https://img.shields.io/badge/flask-3.x-000000?logo=flask&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
 
+## Telas
+
+> Capturas com dados de demonstração.
+
+| Meu Drive | Explorar |
+| --- | --- |
+| ![Meu Drive](docs/drive.jpg) | ![Explorar](docs/explorar.jpg) |
+
+| Prévia de arquivo | Tarefas (indexações e downloads) |
+| --- | --- |
+| ![Prévia](docs/previa.jpg) | ![Tarefas](docs/tarefas.jpg) |
+
 ## Por que existe
 
 Um backup de 80 GB em `.tar.gz` no Drive é um problema quando o disco local não comporta nem o arquivo. O formato gzip não tem acesso aleatório: para chegar a um arquivo no meio, é preciso descomprimir tudo o que vem antes. O Tar Explorer resolve isso em duas etapas:
@@ -17,7 +29,7 @@ Um backup de 80 GB em `.tar.gz` no Drive é um problema quando o disco local nã
 
 | Área | O que faz |
 | --- | --- |
-| **Meu Drive** | Lista seus `.tar.gz`/`.tgz` com o estado do índice (indexado, sem índice, indexando %). |
+| **Meu Drive** | Lista seus `.tar.gz`/`.tgz` com o estado do índice (indexado, sem índice, indexando %). Colunas ordenáveis e redimensionáveis. |
 | **Explorar** | Pastas em cartões ou lista, breadcrumb, busca por caminho, composição da pasta por tamanho. |
 | **Prévia e download** | Prévia de texto (com loader) e download de qualquer arquivo, lendo só o trecho dele. |
 | **Baixar pasta** | Baixa uma pasta inteira (ou o arquivo todo) como `.zip` gerado em streaming, sem gravar nada em disco no servidor. |
@@ -147,6 +159,7 @@ python gdrive_targz_stream.py <ID_OU_URL> --extract caminho/arquivo.txt --out sa
 ├── app.py                    # servidor Flask e API
 ├── tgz_index.py              # indexação, índice, árvore, busca, benchmark e CLI
 ├── gdrive_targz_stream.py    # autenticação e leitura do Drive por Range (streaming)
+├── docs/                     # capturas de tela do README
 ├── static/
 │   ├── index.html
 │   ├── app.css               # tokens de design, tema claro/escuro, responsivo

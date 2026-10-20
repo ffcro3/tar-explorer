@@ -198,7 +198,7 @@ function startResize(e, key, i) {
 }
 
 // ---------------------------------------------------------------- estado global
-const S = { settings: null, me: null, jobs: [], dls: [], drive: [], hook: null, tree: null, sel: null, mode: "cards", search: "", searchRes: null, fid: null, path: "", pop: false, tab: "index", nsig: "" };
+const S = { last: null, view: "drive", settings: null, me: null, jobs: [], dls: [], drive: [], hook: null, tree: null, sel: null, mode: "cards", search: "", searchRes: null, fid: null, path: "", pop: false, tab: "index", nsig: "" };
 const main = () => $("#main");
 const showDetail = on => { $("#detail").hidden = !on; $(".body").classList.toggle("with-detail", on); };
 const runningJobs = () => S.jobs.filter(j => j.state === "running");
@@ -217,9 +217,9 @@ function renderSide(view) {
     h("div", { class: "brand" }, h("div", { class: "logo" }, icon("archive", 17)), "Tar Explorer"),
     h("div", { class: "nav-label" }, tr("nav.menu")),
     NAV.map(([k, label, ic]) => {
-      const disabled = k === "browse" && !S.fid;
+      const disabled = k === "browse" && !S.last;
       const badge = k === "tasks" && nTasks ? h("span", { class: "badge acc" }, nTasks) : null;
-      return h("a", { class: "nav" + (view === k ? " on" : ""), href: k === "browse" ? (S.fid ? `#/browse/${S.fid}` : "#/drive") : `#/${k}`, "aria-disabled": disabled ? "true" : null, onclick: () => { $("#side").classList.remove("open"); $("#scrim").classList.remove("open"); } }, icon(ic), tr(label), badge);
+      return h("a", { class: "nav" + (view === k ? " on" : ""), href: k === "browse" ? (S.last ? `#/browse/${S.last}` : "#/indexes") : `#/${k}`, "aria-disabled": disabled ? "true" : null, onclick: () => { $("#side").classList.remove("open"); $("#scrim").classList.remove("open"); } }, icon(ic), tr(label), badge);
     }),
     h("div", { class: "side-foot" },
       h("div", { class: "seg lang", role: "group", "aria-label": tr("lang.label") }, Object.keys(LANGS).map(l => h("button", { class: l === LANG ? "on" : "", title: LANGS[l], onclick: () => setLang(l) }, l === "pt-BR" ? "PT" : "EN"))),
@@ -292,12 +292,11 @@ function route() {
   const hash = location.hash.slice(2) || "drive";
   const [pathPart, qs] = hash.split("?");
   const parts = pathPart.split("/"), view = parts[0] === "jobs" ? "tasks" : parts[0];
-  S.hook = null; showDetail(false);
+  S.hook = null; S.view = view; showDetail(false);
   if (view === "browse") {
-    const fid = parts[1] || S.fid;
+    const fid = parts[1] || S.last || S.fid;
     if (!fid) { location.hash = "#/drive"; return; }
     if (fid !== S.fid) { S.fid = fid; S.search = ""; S.searchRes = null; }
-    try { localStorage.setItem("fid", fid); } catch { /* sem storage */ }
     S.path = decodeURIComponent(new URLSearchParams(qs || "").get("p") || ""); S.sel = null;
   }
   renderSide(view);
@@ -374,6 +373,9 @@ async function vBrowse() {
     main().replaceChildren(h("div", { class: "alert" }, icon("alert"), e.status === 404 ? tr("browse.notfound") : apiErr(e)));
     return;
   }
+  S.last = fid;  // so um arquivo que ja tem indice vira o destino do menu Explorar
+  try { localStorage.setItem("fid", fid); } catch { /* sem storage */ }
+  if (S.view === "browse") renderSide("browse");
   drawBrowse();
 }
 function crumbsFor() {
@@ -676,8 +678,11 @@ async function refresh() {
   api("/api/me").then(m => { S.me = m; renderSide(curView()); }).catch(() => { /* sem conta */ });
   try { [S.jobs, S.dls] = await Promise.all([api("/api/jobs"), api("/api/downloads")]); } catch { /* ignora */ }
   // Explorar fica ativo desde o início: reabre o último arquivo ou o primeiro índice existente.
-  try { S.fid = localStorage.getItem("fid") || null; } catch { /* sem storage */ }
-  if (!S.fid) { try { S.fid = (await api("/api/indexes")).items[0]?.id || null; } catch { /* ignora */ } }
+  try {
+    const ids = (await api("/api/indexes")).items.map(x => x.id);
+    let last = null; try { last = localStorage.getItem("fid"); } catch { /* sem storage */ }
+    S.last = ids.includes(last) ? last : ids[0] || null;
+  } catch { /* ignora */ }
   addEventListener("hashchange", route);
   route();
   setInterval(refresh, 1500);

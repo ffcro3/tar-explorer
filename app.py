@@ -7,6 +7,7 @@ visualizar/baixar arquivos, medir a velocidade e ajustar as configuracoes.
 """
 import argparse
 import json
+import mimetypes
 import os
 import subprocess
 import sys
@@ -275,6 +276,14 @@ def api_file():
     if not m:
         abort(404)
     name = os.path.basename(path)
+    if request.args.get("inline") == "1":  # imagem exibida na previa (nao conta como download)
+        mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        if not mime.startswith("image/"):
+            abort(415)
+        if m[1] > (64 << 20):
+            abort(413)
+        return Response(gen, mimetype=mime, headers={"Content-Length": str(m[1]), "Cache-Control": "private, max-age=3600",
+                                                     "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox"})
     if download:
         d = track(request.args.get("t"), name, m[1], "file")
         headers = {"Content-Disposition": disposition(name), "Content-Length": str(m[1])}

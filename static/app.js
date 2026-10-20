@@ -17,7 +17,7 @@ const MSG = {
     "browse.folders": "Pastas · {n}", "browse.files_n": "Arquivos · {n}", "browse.empty": "Pasta vazia", "browse.results": "{n} resultados para “{q}”", "browse.nothing": "Nada encontrado", "browse.nothing_hint": "Tente outro trecho do nome ou do caminho.",
     "browse.partial": "Mostrando {a} de {b} itens desta pasta. Use a busca para achar o resto.", "browse.dl_dir_tip": "Baixar pasta (.zip)", "browse.dl_dir_aria": "Baixar pasta {name}",
     "detail.composition": "Composição desta pasta", "detail.dist": "Distribuição por tamanho", "detail.loose": "Arquivos soltos e outros", "detail.hint": "Clique em um arquivo para visualizar. Só o trecho necessário é baixado do Drive.",
-    "detail.path": "Caminho", "detail.binary": "Arquivo binário: sem prévia. Use Baixar.", "detail.truncated": "… (prévia truncada)", "detail.reading": "Lendo o trecho no Drive…",
+    "detail.path": "Caminho", "detail.binary": "Arquivo binário: sem prévia. Use Baixar.", "detail.truncated": "… (prévia truncada)", "detail.reading": "Lendo o trecho no Drive…", "detail.img_fail": "Não foi possível exibir esta imagem. Use Baixar.", "detail.open_full": "Abrir em tamanho real",
     "noidx.sub": "{size} no Drive · ainda sem índice", "noidx.title": "Criar índice", "noidx.desc": "Uma leitura em streaming (nada é gravado do .tar.gz) gera um índice pequeno. Depois a árvore abre na hora e cada arquivo é lido sob demanda. O original no Drive não é alterado.",
     "noidx.save_in": "Salvar em", "noidx.checkpoints": "Checkpoints", "noidx.every": "a cada {n} MB", "noidx.download": "Download", "noidx.conns": "{a} conexões × {c} MB", "noidx.upload": "Enviar o índice também ao Drive (mesma pasta do original)",
     "noidx.create": "Criar índice", "noidx.adjust": "Alterar pasta e ajustes", "noidx.reading": "Lendo o arquivo uma única vez para montar o índice.", "noidx.failed": "Falhou: {e}", "noidx.cancelled": "Indexação cancelada.",
@@ -58,7 +58,7 @@ const MSG = {
     "browse.folders": "Folders · {n}", "browse.files_n": "Files · {n}", "browse.empty": "Empty folder", "browse.results": "{n} results for “{q}”", "browse.nothing": "Nothing found", "browse.nothing_hint": "Try another part of the name or path.",
     "browse.partial": "Showing {a} of {b} items in this folder. Use search to find the rest.", "browse.dl_dir_tip": "Download folder (.zip)", "browse.dl_dir_aria": "Download folder {name}",
     "detail.composition": "Folder composition", "detail.dist": "Size distribution", "detail.loose": "Loose files and others", "detail.hint": "Click a file to preview it. Only the needed bytes are fetched from Drive.",
-    "detail.path": "Path", "detail.binary": "Binary file: no preview. Use Download.", "detail.truncated": "… (preview truncated)", "detail.reading": "Reading the bytes from Drive…",
+    "detail.path": "Path", "detail.binary": "Binary file: no preview. Use Download.", "detail.truncated": "… (preview truncated)", "detail.reading": "Reading the bytes from Drive…", "detail.img_fail": "Could not display this image. Use Download.", "detail.open_full": "Open full size",
     "noidx.sub": "{size} on Drive · no index yet", "noidx.title": "Create index", "noidx.desc": "One streaming pass (the .tar.gz is never written to disk) builds a small index. After that the tree opens instantly and each file is read on demand. The original on Drive is not modified.",
     "noidx.save_in": "Save to", "noidx.checkpoints": "Checkpoints", "noidx.every": "every {n} MB", "noidx.download": "Download", "noidx.conns": "{a} connections × {c} MB", "noidx.upload": "Also upload the index to Drive (same folder as the original)",
     "noidx.create": "Create index", "noidx.adjust": "Change folder and settings", "noidx.reading": "Reading the file once to build the index.", "noidx.failed": "Failed: {e}", "noidx.cancelled": "Indexing cancelled.",
@@ -463,6 +463,13 @@ async function selectFile(it) {
     h("div", { class: "name-cell", style: "margin-bottom:14px" }, ftile(it.name), h("div", { class: "muted num" }, fmt(it.size))),
     h("button", { class: "btn primary", onclick: () => dlFile(it) }, icon("download", 16), tr("common.download")),
     h("dl", { class: "kv", style: "margin-top:16px" }, h("dt", null, tr("detail.path")), h("dd", { class: "mono" }, it.path)), pv]);
+  if (/\.(jpe?g|png|gif|webp|bmp|avif|svg)$/i.test(it.name)) {
+    const src = "/api/file?" + new URLSearchParams({ file: S.fid, path: it.path, inline: "1" });
+    const img = h("img", { class: "imgprev", alt: it.name, src });
+    img.onload = () => pv.replaceChildren(h("a", { href: src, target: "_blank", rel: "noopener", title: tr("detail.open_full") }, img), h("div", { class: "muted", style: "font-size:12.5px;margin-top:8px" }, `${img.naturalWidth} × ${img.naturalHeight}`));
+    img.onerror = () => pv.replaceChildren(h("div", { class: "alert", style: "margin-top:14px" }, icon("alert", 16), tr("detail.img_fail")));
+    return;
+  }
   try {
     const j = await api("/api/file?" + qs);
     pv.replaceChildren(j.binary ? h("div", { class: "note", style: "margin-top:14px" }, icon("alert", 16), tr("detail.binary"))

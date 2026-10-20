@@ -172,6 +172,15 @@ python gdrive_targz_stream.py <ID_OR_URL> --extract path/file.txt --out output/
 └── .gitignore
 ```
 
+## Related projects
+
+Tar Explorer builds on, and is not a replacement for, these great tools:
+
+- [**rapidgzip**](https://github.com/mxmlnkn/rapidgzip): the random-access gzip engine used here for checkpoints and fast seeking.
+- [**ratarmount**](https://github.com/mxmlnkn/ratarmount): mounts `.tar.gz` (and many other archives) as a folder using a seek index. If you prefer a command-line / mount workflow, it is the closest alternative, and it can be combined with a Drive mount such as [rclone](https://rclone.org/).
+
+What Tar Explorer adds is a ready-to-use web file manager, direct Google Drive `Range` reads with parallel connections, an index you can store next to the original on Drive, folder downloads as on-the-fly `.zip`, and background tasks.
+
 ## Limitations
 
 - **The first pass reads the whole archive.** There is no shortcut: the tar lives inside a single gzip stream. Time depends on your network and Drive's limits.

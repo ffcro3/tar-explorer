@@ -267,6 +267,7 @@ function route() {
     const fid = parts[1] || S.fid;
     if (!fid) { location.hash = "#/drive"; return; }
     if (fid !== S.fid) { S.fid = fid; S.search = ""; S.searchRes = null; }
+    try { localStorage.setItem("fid", fid); } catch { /* sem storage */ }
     S.path = decodeURIComponent(new URLSearchParams(qs || "").get("p") || ""); S.sel = null;
   }
   renderSide(view);
@@ -641,6 +642,9 @@ async function refresh() {
   try { S.settings = await api("/api/settings"); } catch (e) { toast(apiErr(e), true); }
   api("/api/me").then(m => { S.me = m; renderSide(curView()); }).catch(() => { /* sem conta */ });
   try { [S.jobs, S.dls] = await Promise.all([api("/api/jobs"), api("/api/downloads")]); } catch { /* ignora */ }
+  // Explorar fica ativo desde o início: reabre o último arquivo ou o primeiro índice existente.
+  try { S.fid = localStorage.getItem("fid") || null; } catch { /* sem storage */ }
+  if (!S.fid) { try { S.fid = (await api("/api/indexes")).items[0]?.id || null; } catch { /* ignora */ } }
   addEventListener("hashchange", route);
   route();
   setInterval(refresh, 1500);

@@ -1,0 +1,35 @@
+# ---- Segredos e credenciais (nunca versionar) ----
+credentials*.json
+client_secret*.json
+client_secrets*.json
+token*.json
+*service-account*.json
+*service_account*.json
+*.pem
+*.key
+*.p12
+.env
+.env.*
+
+# ---- Dados locais gerados pelo app ----
+settings.json
+cache/
+indices/
+*.tgzindex.zip
+*.gzidx
+*.tmp
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# ---- Editor / SO ----
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db

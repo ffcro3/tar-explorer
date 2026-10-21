@@ -282,6 +282,7 @@ def api_file():
             abort(415)
         if m[1] > (64 << 20):
             abort(413)
+        _, gen = ix.read_chunks(path, None)  # imagem inteira: sem o limite da previa de texto
         return Response(gen, mimetype=mime, headers={"Content-Length": str(m[1]), "Cache-Control": "private, max-age=3600",
                                                      "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox"})
     if download:
